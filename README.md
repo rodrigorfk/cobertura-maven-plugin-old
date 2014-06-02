@@ -10,4 +10,7 @@ The import revision is 19761.
 ### Running aggregated reports
 The plugin in this repository contains a new aggregated-report Mojo, this new Mojo generates a correct aggregated report of all modules in the maven reactor process.
 
-To generate the report using this Mojo, issue the following command: `mvn cobertura:clean cobertura:instrument test cobertura:aggregate-report`
+To generate the report using this Mojo, issue the following command: 
+```bash
+mvn cobertura:clean cobertura:instrument test cobertura:aggregate-report
+```
