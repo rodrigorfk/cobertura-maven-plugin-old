@@ -19,8 +19,6 @@
  */
 package org.codehaus.mojo.cobertura;
 
-import net.sourceforge.cobertura.coveragedata.CoverageDataFileHandler;
-import net.sourceforge.cobertura.coveragedata.ProjectData;
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.doxia.siterenderer.Renderer;
 import org.apache.maven.plugin.MojoExecutionException;
@@ -40,6 +38,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.ResourceBundle;
+import org.codehaus.mojo.cobertura.tasks.MergeTask;
 
 /**
  * Instruments, Tests, and Generates a Cobertura Report.
@@ -266,7 +265,7 @@ public class CoberturaReportMojo
     /**
      * Generates aggregate cobertura reports for all multi-module projects.
      */
-    private void executeAggregateReport( Locale locale )
+    protected void executeAggregateReport( Locale locale )
         throws MavenReportException
     {
         for ( MavenProject proj : reactorProjects )
@@ -302,18 +301,9 @@ public class CoberturaReportMojo
 
         getLog().info( "Executing aggregate cobertura:report for " + curProject.getName() );
 
-        ProjectData aggProjectData = new ProjectData();
-        for ( File serFile : serFiles )
-        {
-            ProjectData data = CoverageDataFileHandler.loadCoverageData( serFile );
-            aggProjectData.merge( data );
-        }
-
         File aggSerFile = new File( curProject.getBasedir(), relDataFileName );
-        aggSerFile.getAbsoluteFile().getParentFile().mkdirs();
-        getLog().info( "Saving aggregate cobertura information in " + aggSerFile.getAbsolutePath() );
-        CoverageDataFileHandler.saveCoverageData( aggProjectData, aggSerFile );
-
+        executeMerge(aggSerFile, serFiles);
+        
         // get all compile source roots
         List<String> aggCompileSourceRoots = new ArrayList<String>();
         for ( MavenProject child : children )
@@ -324,6 +314,32 @@ public class CoberturaReportMojo
         File reportDir = new File( curProject.getBasedir(), relAggregateOutputDir );
         reportDir.mkdirs();
         executeReport( aggSerFile, reportDir, aggCompileSourceRoots );
+    }
+
+    private void executeMerge( File aggSerFile, List<File> serFiles ) throws MavenReportException
+    {
+        aggSerFile.getAbsoluteFile().getParentFile().mkdirs();
+        getLog().info( "Saving aggregate cobertura information in " + aggSerFile.getAbsolutePath() );
+        
+        MergeTask task = new MergeTask();
+        
+        // task defaults
+        task.setLog( getLog() );
+        task.setPluginClasspathList( pluginClasspathList );
+        task.setQuiet( quiet );
+        
+        // task specifics
+        task.setIntermediateDatafiles( serFiles );
+        task.setDataFile( aggSerFile );
+        
+        try
+        {
+            task.execute();
+        }
+        catch ( MojoExecutionException e )
+        {
+            throw new MavenReportException( "Error in Cobertura Merge generation: " + e.getMessage(), e );
+        }
     }
 
     /**
@@ -349,8 +365,8 @@ public class CoberturaReportMojo
         CommandLineArguments cmdLineArgs;
         cmdLineArgs = new CommandLineArguments();
         cmdLineArgs.setUseCommandsFile( true );
-        task.setCmdLineArgs( cmdLineArgs );
-
+//        task.setCmdLineArgs( cmdLineArgs );
+        
         if ( format != null )
         {
             formats = new String[]{ format };
@@ -456,7 +472,7 @@ public class CoberturaReportMojo
     /**
      * Returns whether or not we can generate any aggregate reports at this time.
      */
-    private boolean canGenerateAggregateReports()
+    protected boolean canGenerateAggregateReports()
     {
         // we only generate aggregate reports after the last project runs
         if ( aggregate && isLastProject( project, reactorProjects ) )
